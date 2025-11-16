@@ -95,6 +95,48 @@ def parse_order_multiline(text):
 
     return {"name": name.strip(), "dish": dish.strip(), "qty": qty}
 
+def send_message_to_phone(phone_number, text):
+    url = "https://wa.me/" + phone_number
+    driver.get(url)
+    time.sleep(3)
+
+    # Ищем кнопку "Продолжить в WhatsApp Web"
+    try:
+        continue_btn = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((
+                By.XPATH,
+                "//a[contains(@href, 'send')]"
+            ))
+        )
+        driver.execute_script("arguments[0].click();", continue_btn)
+        print("Кнопка перехода нажата")
+    except:
+        print("Не удалось нажать кнопку перехода в чат")
+        return
+
+    # Ждём поле ввода
+    try:
+        box = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                "//div[@contenteditable='true']"
+            ))
+        )
+    except:
+        print("Не найдено поле ввода")
+        return
+
+    # Отправка
+    for line in text.split("\n"):
+        box.send_keys(line)
+        box.send_keys(Keys.SHIFT, Keys.ENTER)
+    box.send_keys(Keys.ENTER)
+
+    print("Сообщение отправлено на номер", phone_number)
+
+    # Возвращаемся в группу
+    open_group(GROUP_NAME)
+
 def send_message(text):
     # ждём поле ввода сообщений
     box = WebDriverWait(driver, 15).until(
@@ -128,6 +170,29 @@ def notify_start():
 open_group(GROUP_NAME)
 notify_start()  # уведомляем группу, что бот запущен
 
+def open_private_chat(user_name):
+    search_box = driver.find_element(By.XPATH, "//div[@contenteditable='true'][@data-tab='3']")
+    search_box.click()
+    search_box.clear()
+    time.sleep(1)
+    search_box.send_keys(user_name)
+    search_box.send_keys(Keys.ENTER)
+    print(f"Открыт личный чат с: {user_name}")
+    time.sleep(2)
+
+def send_orders_to_user(user_name):
+    # открыть личку
+    open_private_chat(user_name)
+
+    # отправить список
+    summary = format_orders(orders)
+    send_message(summary)
+
+    print("Заказы отправлены пользователю:", user_name)
+
+    # вернуться в группу
+    open_group(GROUP_NAME)
+
 BOT_NAME = "Snabjenie"
 orders = {}
 last_msg_text = ""
@@ -149,6 +214,8 @@ while True:
         continue
     last_msg_text = text
 
+    
+
     # --------------------------
     # Парсим заказ
     # --------------------------
@@ -169,8 +236,16 @@ while True:
     # --------------------------
     elif text.lower() == "/list":
         send_message(format_orders(orders))
+
     elif text.lower() == "/clear":
         orders.clear()
         send_message("Список заказов очищен.")
+
+    elif text.lower() == "/sendtoars":
+        send_message_to_phone(
+            "996502224244",  # <-- сюда твой номер БЕЗ плюса
+            format_orders(orders)
+        )
+        send_message("Отчёт отправлен в личку Арсению.")
 
     time.sleep(1)
